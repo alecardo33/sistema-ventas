@@ -4,7 +4,24 @@ import RoleRoute from '@/routes/RoleRoute'
 import AppLayout from '@/components/layout/AppLayout'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
-import ModuloPendiente from '@/pages/ModuloPendiente'
+
+import ClientesPage from '@/pages/clientes'
+import ProductosPage from '@/pages/productos'
+import ProveedoresPage from '@/pages/proveedores'
+import { VentasPage, NuevaVentaPage, VentaDetallePage } from '@/pages/ventas'
+import { CotizacionesPage, NuevaCotizacionPage, CotizacionDetallePage } from '@/pages/cotizaciones'
+import { ComprasPage, NuevaCompraPage, CompraDetallePage } from '@/pages/compras'
+import { InventarioPage, KardexSelectorPage, KardexPage, AjusteInventarioPage } from '@/pages/inventario'
+import { CajaPage } from '@/pages/caja'
+import {
+  ReportesPage,
+  ReporteVentasPage,
+  ReporteCajaPage,
+  ReporteInventarioPage,
+  ReporteKardexPage,
+  ReporteCuentasPorCobrarPage,
+} from '@/pages/reportes'
+import { EmpresaPage, UsuariosPage, NuevoUsuarioPage, RespaldoPage } from '@/pages/configuracion'
 
 export default function App() {
   return (
@@ -18,61 +35,49 @@ export default function App() {
 
           {/* Ventas — admin y vendedor */}
           <Route element={<RoleRoute allowed={['admin', 'vendedor']} />}>
-            <Route path="/ventas" element={<ModuloPendiente titulo="Ventas" />} />
-            <Route path="/ventas/nueva" element={<ModuloPendiente titulo="Nueva venta" />} />
-            <Route path="/ventas/:id" element={<ModuloPendiente titulo="Detalle de venta" />} />
-            <Route path="/ventas/:id/pagos" element={<ModuloPendiente titulo="Pagos de venta" />} />
+            <Route path="/ventas" element={<VentasPage />} />
+            <Route path="/ventas/nueva" element={<NuevaVentaPage />} />
+          </Route>
+          {/* Detalle de venta — también visible para Contabilidad (registrar pagos) */}
+          <Route element={<RoleRoute allowed={['admin', 'vendedor', 'contabilidad']} />}>
+            <Route path="/ventas/:id" element={<VentaDetallePage />} />
           </Route>
 
           {/* Cotizaciones — todos los roles autenticados */}
-          <Route path="/cotizaciones" element={<ModuloPendiente titulo="Cotizaciones" />} />
-          <Route path="/cotizaciones/nueva" element={<ModuloPendiente titulo="Nueva cotización" />} />
-          <Route path="/cotizaciones/:id" element={<ModuloPendiente titulo="Detalle de cotización" />} />
+          <Route path="/cotizaciones" element={<CotizacionesPage />} />
+          <Route path="/cotizaciones/nueva" element={<NuevaCotizacionPage />} />
+          <Route path="/cotizaciones/:id" element={<CotizacionDetallePage />} />
 
-          {/* Clientes — todos los roles autenticados */}
-          <Route path="/clientes" element={<ModuloPendiente titulo="Clientes" />} />
-          <Route path="/clientes/nuevo" element={<ModuloPendiente titulo="Nuevo cliente" />} />
-          <Route path="/clientes/:id" element={<ModuloPendiente titulo="Detalle de cliente" />} />
-          <Route path="/clientes/:id/cuenta" element={<ModuloPendiente titulo="Cuenta del cliente" />} />
+          {/* Clientes y Productos — todos los roles autenticados */}
+          <Route path="/clientes" element={<ClientesPage />} />
+          <Route path="/productos" element={<ProductosPage />} />
 
-          {/* Productos — todos los roles autenticados */}
-          <Route path="/productos" element={<ModuloPendiente titulo="Productos" />} />
-          <Route path="/productos/nuevo" element={<ModuloPendiente titulo="Nuevo producto" />} />
-          <Route path="/productos/:id" element={<ModuloPendiente titulo="Detalle de producto" />} />
-
-          {/* Compras — admin y contabilidad */}
+          {/* Compras, Proveedores, Inventario, Caja, Reportes — admin y contabilidad */}
           <Route element={<RoleRoute allowed={['admin', 'contabilidad']} />}>
-            <Route path="/compras" element={<ModuloPendiente titulo="Compras" />} />
-            <Route path="/compras/nueva" element={<ModuloPendiente titulo="Nueva compra" />} />
-            <Route path="/compras/:id" element={<ModuloPendiente titulo="Detalle de compra" />} />
-            <Route path="/proveedores" element={<ModuloPendiente titulo="Proveedores" />} />
-            <Route path="/proveedores/nuevo" element={<ModuloPendiente titulo="Nuevo proveedor" />} />
-            <Route path="/proveedores/:id" element={<ModuloPendiente titulo="Detalle de proveedor" />} />
-            <Route path="/inventario" element={<ModuloPendiente titulo="Inventario" />} />
-            <Route path="/inventario/kardex" element={<ModuloPendiente titulo="Kardex" />} />
-            <Route path="/inventario/kardex/:productoId" element={<ModuloPendiente titulo="Kardex de producto" />} />
-            <Route path="/inventario/ajuste" element={<ModuloPendiente titulo="Ajuste de inventario" />} />
-            <Route path="/caja" element={<ModuloPendiente titulo="Caja" />} />
-            <Route path="/caja/movimientos" element={<ModuloPendiente titulo="Movimientos de caja" />} />
-            <Route path="/caja/nuevo-ingreso" element={<ModuloPendiente titulo="Nuevo ingreso" />} />
-            <Route path="/caja/nuevo-egreso" element={<ModuloPendiente titulo="Nuevo egreso" />} />
-            <Route path="/reportes" element={<ModuloPendiente titulo="Reportes" />} />
-            <Route path="/reportes/ventas" element={<ModuloPendiente titulo="Reporte de ventas" />} />
-            <Route path="/reportes/ingresos" element={<ModuloPendiente titulo="Reporte de ingresos" />} />
-            <Route path="/reportes/egresos" element={<ModuloPendiente titulo="Reporte de egresos" />} />
-            <Route path="/reportes/inventario" element={<ModuloPendiente titulo="Reporte de inventario" />} />
-            <Route path="/reportes/kardex" element={<ModuloPendiente titulo="Reporte de kardex" />} />
-            <Route path="/reportes/cuentas-por-cobrar" element={<ModuloPendiente titulo="Cuentas por cobrar" />} />
+            <Route path="/compras" element={<ComprasPage />} />
+            <Route path="/compras/nueva" element={<NuevaCompraPage />} />
+            <Route path="/compras/:id" element={<CompraDetallePage />} />
+            <Route path="/proveedores" element={<ProveedoresPage />} />
+            <Route path="/inventario" element={<InventarioPage />} />
+            <Route path="/inventario/kardex" element={<KardexSelectorPage />} />
+            <Route path="/inventario/kardex/:productoId" element={<KardexPage />} />
+            <Route path="/inventario/ajuste" element={<AjusteInventarioPage />} />
+            <Route path="/caja" element={<CajaPage />} />
+            <Route path="/caja/movimientos" element={<Navigate to="/caja" replace />} />
+            <Route path="/reportes" element={<ReportesPage />} />
+            <Route path="/reportes/ventas" element={<ReporteVentasPage />} />
+            <Route path="/reportes/caja" element={<ReporteCajaPage />} />
+            <Route path="/reportes/inventario" element={<ReporteInventarioPage />} />
+            <Route path="/reportes/kardex" element={<ReporteKardexPage />} />
+            <Route path="/reportes/cuentas-por-cobrar" element={<ReporteCuentasPorCobrarPage />} />
           </Route>
 
-          {/* Configuración, usuarios y anulaciones — solo admin */}
+          {/* Configuración y usuarios — solo admin */}
           <Route element={<RoleRoute allowed={['admin']} />}>
-            <Route path="/ventas/:id/anular" element={<ModuloPendiente titulo="Anular venta" />} />
-            <Route path="/compras/:id/anular" element={<ModuloPendiente titulo="Anular compra" />} />
-            <Route path="/configuracion/empresa" element={<ModuloPendiente titulo="Configuración de empresa" />} />
-            <Route path="/configuracion/usuarios" element={<ModuloPendiente titulo="Usuarios" />} />
-            <Route path="/configuracion/usuarios/nuevo" element={<ModuloPendiente titulo="Nuevo usuario" />} />
-            <Route path="/configuracion/respaldo" element={<ModuloPendiente titulo="Respaldo y restauración" />} />
+            <Route path="/configuracion/empresa" element={<EmpresaPage />} />
+            <Route path="/configuracion/usuarios" element={<UsuariosPage />} />
+            <Route path="/configuracion/usuarios/nuevo" element={<NuevoUsuarioPage />} />
+            <Route path="/configuracion/respaldo" element={<RespaldoPage />} />
           </Route>
 
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

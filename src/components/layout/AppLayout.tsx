@@ -23,6 +23,7 @@ const MENU: MenuItem[] = [
   { label: 'Reportes', to: '/reportes', roles: ['admin', 'contabilidad'] },
   { label: 'Configuración', to: '/configuracion/empresa', roles: ['admin'] },
   { label: 'Usuarios', to: '/configuracion/usuarios', roles: ['admin'] },
+  { label: 'Respaldo', to: '/configuracion/respaldo', roles: ['admin'] },
 ]
 
 export default function AppLayout() {
@@ -34,7 +35,7 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen flex bg-slate-50">
       {/* Sidebar - escritorio */}
-      <aside className="hidden md:flex md:flex-col w-60 bg-slate-900 text-slate-100 shrink-0">
+      <aside className="hidden md:flex md:flex-col w-60 bg-slate-900 text-slate-100 shrink-0 print:hidden">
         <div className="px-4 py-4 font-semibold border-b border-slate-800">Sistema de Ventas</div>
         <nav className="flex-1 overflow-y-auto py-2">
           {visibleItems.map((item) => (
@@ -78,7 +79,7 @@ export default function AppLayout() {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-white border-b flex items-center justify-between px-4">
+        <header className="h-14 bg-white border-b flex items-center justify-between px-4 print:hidden">
           <button
             className="md:hidden text-slate-600 text-xl leading-none"
             onClick={() => setMobileOpen(true)}

@@ -378,3 +378,125 @@ create policy "mov_caja_insert_authenticated" on movimientos_caja
 --
 --   update public.profiles set role = 'admin' where id = '<uuid-del-usuario>';
 -- =====================================================================
+
+-- =====================================================================
+-- 6. FUNCIONES RPC ADICIONALES (Paso 2 de implementación)
+-- ---------------------------------------------------------------------
+-- La política "productos_update_admin" y "ventas_update_admin_only"
+-- restringen el UPDATE directo de esas tablas solo a Admin (correcto:
+-- así un vendedor nunca puede alterar precios ni ventas ya registradas).
+-- Pero un Vendedor SÍ necesita poder descontar stock al vender, y
+-- Contabilidad necesita poder actualizar el costo y registrar abonos a
+-- crédito. Estas funciones "security definer" abren, de forma controlada
+-- y siempre trazada, exactamente esas operaciones puntuales — sin usar
+-- service_role ni backend propio.
+-- Ejecutar UNA SOLA VEZ, después del script anterior.
+-- =====================================================================
+
+create or replace function public.registrar_movimiento_inventario(
+  p_producto_id uuid,
+  p_tipo text,
+  p_entrada numeric,
+  p_salida numeric,
+  p_documento_ref uuid,
+  p_usuario_id uuid
+) returns numeric
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_nuevo_stock numeric;
+begin
+  if auth.uid() is null then
+    raise exception 'No autenticado';
+  end if;
+  if p_usuario_id <> auth.uid() then
+    raise exception 'usuario_id debe coincidir con el usuario autenticado';
+  end if;
+  if p_tipo not in ('compra','venta','ajuste','anulacion_compra','anulacion_venta') then
+    raise exception 'Tipo de movimiento inválido';
+  end if;
+
+  update productos
+    set stock = stock + p_entrada - p_salida
+    where id = p_producto_id
+    returning stock into v_nuevo_stock;
+
+  if v_nuevo_stock is null then
+    raise exception 'Producto no encontrado';
+  end if;
+
+  insert into movimientos_inventario (producto_id, tipo, entrada, salida, saldo, documento_ref, usuario_id)
+  values (p_producto_id, p_tipo, p_entrada, p_salida, v_nuevo_stock, p_documento_ref, p_usuario_id);
+
+  return v_nuevo_stock;
+end;
+$$;
+
+grant execute on function public.registrar_movimiento_inventario(uuid, text, numeric, numeric, uuid, uuid) to authenticated;
+
+create or replace function public.actualizar_precio_compra(
+  p_producto_id uuid,
+  p_precio numeric
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'No autenticado';
+  end if;
+  if public.current_role() not in ('admin','contabilidad') then
+    raise exception 'No autorizado';
+  end if;
+
+  update productos set precio_compra = p_precio where id = p_producto_id;
+end;
+$$;
+
+grant execute on function public.actualizar_precio_compra(uuid, numeric) to authenticated;
+
+create or replace function public.registrar_pago_venta(
+  p_venta_id uuid,
+  p_monto numeric,
+  p_metodo_pago text,
+  p_usuario_id uuid
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_saldo numeric;
+begin
+  if auth.uid() is null then
+    raise exception 'No autenticado';
+  end if;
+  if p_usuario_id <> auth.uid() then
+    raise exception 'usuario_id debe coincidir con el usuario autenticado';
+  end if;
+  if public.current_role() not in ('admin','contabilidad') then
+    raise exception 'No autorizado';
+  end if;
+  if p_monto <= 0 then
+    raise exception 'El monto debe ser mayor a 0';
+  end if;
+
+  insert into pagos_venta (venta_id, monto, metodo_pago, usuario_id)
+  values (p_venta_id, p_monto, p_metodo_pago, p_usuario_id);
+
+  update ventas
+    set saldo_pendiente = greatest(0, saldo_pendiente - p_monto),
+        estado = case when greatest(0, saldo_pendiente - p_monto) = 0 then 'pagada' else 'parcial' end
+    where id = p_venta_id
+    returning saldo_pendiente into v_saldo;
+
+  if v_saldo is null then
+    raise exception 'Venta no encontrada';
+  end if;
+end;
+$$;
+
+grant execute on function public.registrar_pago_venta(uuid, numeric, text, uuid) to authenticated;
