@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import {
   getEmpresaConfig,
@@ -42,7 +42,8 @@ export function EmpresaPage() {
     setOk(false)
     try {
       const saved = await guardarEmpresaConfig(config)
-      setConfig(saved)
+      // Fusiona la respuesta del backend manteniendo el estado previo
+      setConfig((prev) => ({ ...prev, ...saved }))
       setOk(true)
     } catch (e) {
       setError((e as Error).message)
@@ -104,20 +105,57 @@ export function UsuariosPage() {
 
   async function load() {
     setLoading(true)
-    setUsuarios(await listUsuarios())
+    const data = await listUsuarios()
+    setUsuarios(data)
     setLoading(false)
   }
+
   useEffect(() => {
     load()
   }, [])
 
+  // Cambiar rol con actualización optimista inmediata en la UI
   async function cambiarRol(id: string, role: Role) {
-    await actualizarUsuario(id, { role })
-    load()
+    setUsuarios((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, role } : u))
+    )
+    try {
+      await actualizarUsuario(id, { role })
+    } catch (e) {
+      alert('Error al actualizar el rol: ' + (e as Error).message)
+      await load() // Revertir en caso de fallar la API
+    }
   }
+
+  // Activar/Desactivar con actualización optimista inmediata en la UI
   async function toggleActivo(id: string, is_active: boolean) {
-    await actualizarUsuario(id, { is_active })
-    load()
+    setUsuarios((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, is_active } : u))
+    )
+    try {
+      await actualizarUsuario(id, { is_active })
+    } catch (e) {
+      alert('Error al cambiar el estado: ' + (e as Error).message)
+      await load() // Revertir en caso de fallar la API
+    }
+  }
+
+  // Restablecer/Cambiar contraseña
+  async function cambiarPassword(id: string, nombre: string) {
+    const nuevaPassword = window.prompt(`Ingresa la nueva contraseña para "${nombre}":`)
+    if (!nuevaPassword) return
+
+    if (nuevaPassword.length < 6) {
+      alert('La contraseña debe tener al menos 6 caracteres.')
+      return
+    }
+
+    try {
+      await actualizarUsuario(id, { password: nuevaPassword } as Partial<UsuarioProfile>)
+      alert('Contraseña actualizada correctamente.')
+    } catch (e) {
+      alert('Error al actualizar la contraseña: ' + (e as Error).message)
+    }
   }
 
   return (
@@ -138,7 +176,10 @@ export function UsuariosPage() {
             <Card key={u.id} className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <p className="font-medium">{u.full_name}</p>
-                <p className="text-xs text-slate-500">{u.is_active ? <Badge color="green">activo</Badge> : <Badge color="red">inactivo</Badge>}</p>
+                {u.email && <p className="text-sm text-slate-500">{u.email}</p>}
+                <div className="mt-1">
+                  {u.is_active ? <Badge color="green">activo</Badge> : <Badge color="red">inactivo</Badge>}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Select value={u.role} onChange={(e) => cambiarRol(u.id, e.target.value as Role)}>
@@ -149,6 +190,9 @@ export function UsuariosPage() {
                 <Button variant="secondary" onClick={() => toggleActivo(u.id, !u.is_active)}>
                   {u.is_active ? 'Desactivar' : 'Activar'}
                 </Button>
+                <Button variant="secondary" onClick={() => cambiarPassword(u.id, u.full_name)}>
+                  Clave
+                </Button>
               </div>
             </Card>
           ))}
@@ -158,14 +202,17 @@ export function UsuariosPage() {
   )
 }
 
+// ---------------------------------------------------------------------
+// NUEVO USUARIO
+// ---------------------------------------------------------------------
 export function NuevoUsuarioPage() {
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<Role>('vendedor')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [ok, setOk] = useState(false)
 
   async function handleSubmit() {
     if (!email || !password || !fullName) return setError('Completa todos los campos.')
@@ -174,10 +221,8 @@ export function NuevoUsuarioPage() {
     setError(null)
     try {
       await crearUsuario({ email, password, full_name: fullName, role })
-      setOk(true)
-      setEmail('')
-      setPassword('')
-      setFullName('')
+      // Redirige al listado de usuarios tras guardar exitosamente
+      navigate('/configuracion/usuarios')
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -206,61 +251,8 @@ export function NuevoUsuarioPage() {
           </Select>
         </Field>
         <ErrorText>{error}</ErrorText>
-        {ok && <p className="text-sm text-green-600">Usuario creado correctamente.</p>}
         <Button onClick={handleSubmit} disabled={saving} className="w-full">
           {saving ? 'Creando…' : 'Crear usuario'}
-        </Button>
-      </Card>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------
-// RESPALDO (exportación a Excel)
-// ---------------------------------------------------------------------
-export function RespaldoPage() {
-  const [exporting, setExporting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function handleExport() {
-    setExporting(true)
-    setError(null)
-    try {
-      const XLSX = await import('xlsx')
-      const [clientes, proveedores, productos, ventas, compras, caja] = await Promise.all([
-        listClientes(),
-        listProveedores(),
-        listProductos(),
-        listVentas({}),
-        listCompras({}),
-        listMovimientosCaja(),
-      ])
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientes), 'Clientes')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(proveedores), 'Proveedores')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(productos), 'Productos')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ventas.map(({ clientes: _c, ...v }) => v)), 'Ventas')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(compras.map(({ proveedores: _p, ...c }) => c)), 'Compras')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(caja), 'Caja')
-      XLSX.writeFile(wb, `respaldo-sistema-ventas-${new Date().toISOString().slice(0, 10)}.xlsx`)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  return (
-    <div className="max-w-md">
-      <PageHeader title="Respaldo" />
-      <Card className="space-y-3">
-        <p className="text-sm text-slate-600">
-          Genera un archivo Excel con clientes, proveedores, productos, ventas, compras y movimientos de caja. No incluye
-          usuarios ni contraseñas.
-        </p>
-        <ErrorText>{error}</ErrorText>
-        <Button onClick={handleExport} disabled={exporting} className="w-full">
-          {exporting ? 'Generando…' : 'Descargar respaldo (.xlsx)'}
         </Button>
       </Card>
     </div>
