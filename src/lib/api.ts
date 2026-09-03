@@ -596,6 +596,7 @@ export async function subirLogo(file: File): Promise<string> {
 export interface UsuarioProfile {
   id: string
   full_name: string
+  email?: string
   role: Role
   phone: string | null
   is_active: boolean
