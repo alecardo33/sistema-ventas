@@ -9,10 +9,11 @@ import {
   registrarPagoVenta,
   listClientes,
   listProductos,
+  getEmpresaConfig,
   type ItemCarrito,
   type VentaConDetalle,
 } from '@/lib/api'
-import type { Cliente, Producto, Venta } from '@/types/database'
+import type { Cliente, Producto, Venta, EmpresaConfig } from '@/types/database'
 import { formatDateTime, formatMoney, todayISO, daysAgoISO } from '@/utils/format'
 import { Badge, Button, Card, ConfirmModal, EmptyState, ErrorText, Field, Input, PageHeader, Select, Spinner, Table, Textarea } from '@/components/ui'
 import { ClienteQuickCreateModal } from '@/pages/clientes'
@@ -216,8 +217,9 @@ export function NuevaVentaPage() {
             {productosFiltrados.map((p) => (
               <button
                 key={p.id}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex justify-between"
+                type="button"
                 onClick={() => agregarProducto(p)}
+                className="w-full text-left px-3 py-2 hover:bg-slate-50 flex justify-between text-sm"
               >
                 <span>
                   {p.nombre} <span className="text-slate-400 text-xs">({p.codigo})</span>
@@ -227,12 +229,8 @@ export function NuevaVentaPage() {
             ))}
           </div>
         )}
-      </Card>
 
-      <Card>
-        {items.length === 0 ? (
-          <EmptyState text="Aún no agregaste productos al carrito." />
-        ) : (
+        {items.length > 0 && (
           <Table head={['Producto', 'Cantidad', 'P. Unitario', 'Subtotal', '']}>
             {items.map((i) => (
               <tr key={i.producto_id}>
@@ -317,6 +315,7 @@ export function VentaDetallePage() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuth()
   const [venta, setVenta] = useState<VentaConDetalle | null>(null)
+  const [empresa, setEmpresa] = useState<Partial<EmpresaConfig> | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAnular, setShowAnular] = useState(false)
   const [motivo, setMotivo] = useState('')
@@ -328,6 +327,11 @@ export function VentaDetallePage() {
   async function load() {
     setLoading(true)
     if (id) setVenta(await getVenta(id))
+    try {
+      setEmpresa(await getEmpresaConfig())
+    } catch {
+      setEmpresa(null) // si falla, la nota simplemente no muestra el encabezado de empresa
+    }
     setLoading(false)
   }
   useEffect(() => {
@@ -347,18 +351,42 @@ export function VentaDetallePage() {
       <PageHeader
         title={`Venta ${venta.id.slice(0, 8)}`}
         actions={
-          <>
+          // print:hidden → estos botones nunca se imprimen, solo se ven en pantalla
+          <div className="flex gap-2 print:hidden">
             <Button variant="secondary" onClick={() => window.print()}>
               Imprimir nota
             </Button>
             {puedeRegistrarPago && <Button onClick={() => setShowPago(true)}>Registrar pago</Button>}
-            {puedeAnular && <Button variant="danger" onClick={() => setShowAnular(true)}>Anular venta</Button>}
-          </>
+            {puedeAnular && (
+              <Button variant="danger" onClick={() => setShowAnular(true)}>
+                Anular venta
+              </Button>
+            )}
+          </div>
         }
       />
 
-      <div id="nota-venta" className="print:block">
+      <div id="nota-venta">
         <Card>
+          {/* Encabezado de la empresa: logo, nombre, NIT, dirección, teléfono */}
+          <div className="flex items-start justify-between gap-4 pb-3 mb-3 border-b">
+            <div className="flex items-center gap-3">
+              {empresa?.logo_url && (
+                <img src={empresa.logo_url} alt="Logo" className="h-14 w-14 object-contain" />
+              )}
+              <div>
+                <p className="font-bold text-base">{empresa?.nombre ?? 'Mi Empresa'}</p>
+                {empresa?.nit && <p className="text-xs text-slate-500">NIT: {empresa.nit}</p>}
+                {empresa?.direccion && <p className="text-xs text-slate-500">{empresa.direccion}</p>}
+                {empresa?.telefono && <p className="text-xs text-slate-500">Tel: {empresa.telefono}</p>}
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-slate-400">Nota de venta</p>
+              <p className="text-xs text-slate-400">{venta.id.slice(0, 8)}</p>
+            </div>
+          </div>
+
           <div className="flex justify-between mb-3">
             <div>
               <p className="font-semibold">{venta.clientes?.nombre}</p>
