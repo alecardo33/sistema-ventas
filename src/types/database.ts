@@ -5,6 +5,7 @@ export type Role = 'admin' | 'vendedor' | 'contabilidad'
 export interface Profile {
   id: string
   full_name: string
+  email?: string 
   role: Role
   phone: string | null
   is_active: boolean

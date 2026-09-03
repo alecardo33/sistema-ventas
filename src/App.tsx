@@ -21,7 +21,7 @@ import {
   ReporteKardexPage,
   ReporteCuentasPorCobrarPage,
 } from '@/pages/reportes'
-import { EmpresaPage, UsuariosPage, NuevoUsuarioPage, RespaldoPage } from '@/pages/configuracion'
+import { EmpresaPage, UsuariosPage, NuevoUsuarioPage } from '@/pages/configuracion'
 
 export default function App() {
   return (
@@ -77,7 +77,6 @@ export default function App() {
             <Route path="/configuracion/empresa" element={<EmpresaPage />} />
             <Route path="/configuracion/usuarios" element={<UsuariosPage />} />
             <Route path="/configuracion/usuarios/nuevo" element={<NuevoUsuarioPage />} />
-            <Route path="/configuracion/respaldo" element={<RespaldoPage />} />
           </Route>
 
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
