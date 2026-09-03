@@ -262,7 +262,7 @@ export function CompraDetallePage() {
       <PageHeader
         title={`Compra ${compra.id.slice(0, 8)}`}
         actions={
-          <>
+          <div className="flex gap-2 print:hidden">
             <Button variant="secondary" onClick={() => window.print()}>
               Imprimir
             </Button>
@@ -271,7 +271,7 @@ export function CompraDetallePage() {
                 Anular compra
               </Button>
             )}
-          </>
+          </div>
         }
       />
       <Card>

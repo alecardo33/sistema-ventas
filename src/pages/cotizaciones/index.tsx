@@ -259,7 +259,7 @@ export function CotizacionDetallePage() {
       <PageHeader
         title={`Cotización ${cot.id.slice(0, 8)}`}
         actions={
-          <>
+          <div className="flex gap-2 print:hidden">
             <Button variant="secondary" onClick={() => window.print()}>
               Imprimir
             </Button>
@@ -275,7 +275,7 @@ export function CotizacionDetallePage() {
                 Anular
               </Button>
             )}
-          </>
+          </div>
         }
       />
 

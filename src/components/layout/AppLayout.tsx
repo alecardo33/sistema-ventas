@@ -1,7 +1,8 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import type { Role } from '@/types/database'
+import { getEmpresaConfig } from '@/lib/api'
+import type { Role, EmpresaConfig } from '@/types/database'
 
 interface MenuItem {
   label: string
@@ -29,6 +30,13 @@ const MENU: MenuItem[] = [
 export default function AppLayout() {
   const { profile, signOut } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [empresa, setEmpresa] = useState<Partial<EmpresaConfig> | null>(null)
+
+  useEffect(() => {
+    getEmpresaConfig()
+      .then(setEmpresa)
+      .catch(() => setEmpresa(null))
+  }, [])
 
   const visibleItems = MENU.filter((item) => profile && item.roles.includes(profile.role))
 
@@ -36,7 +44,12 @@ export default function AppLayout() {
     <div className="min-h-screen flex bg-slate-50">
       {/* Sidebar - escritorio */}
       <aside className="hidden md:flex md:flex-col w-60 bg-slate-900 text-slate-100 shrink-0 print:hidden">
-        <div className="px-4 py-4 font-semibold border-b border-slate-800">Sistema de Ventas</div>
+        <div className="px-4 py-4 font-semibold border-b border-slate-800 flex items-center gap-2">
+          {empresa?.logo_url && (
+            <img src={empresa.logo_url} alt="Logo" className="h-8 w-8 object-contain rounded bg-white/10" />
+          )}
+          <span className="truncate">{empresa?.nombre || 'Sistema de Ventas'}</span>
+        </div>
         <nav className="flex-1 overflow-y-auto py-2">
           {visibleItems.map((item) => (
             <NavLink
@@ -59,7 +72,12 @@ export default function AppLayout() {
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-slate-900 text-slate-100 overflow-y-auto">
-            <div className="px-4 py-4 font-semibold border-b border-slate-800">Menú</div>
+            <div className="px-4 py-4 font-semibold border-b border-slate-800 flex items-center gap-2">
+              {empresa?.logo_url && (
+                <img src={empresa.logo_url} alt="Logo" className="h-8 w-8 object-contain rounded bg-white/10" />
+              )}
+              <span className="truncate">{empresa?.nombre || 'Menú'}</span>
+            </div>
             {visibleItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -87,7 +105,11 @@ export default function AppLayout() {
           >
             ☰
           </button>
-          <div className="text-sm text-slate-500 truncate">
+          <div className="flex items-center gap-2 md:hidden">
+            {empresa?.logo_url && <img src={empresa.logo_url} alt="Logo" className="h-6 w-6 object-contain" />}
+            <span className="text-sm font-medium text-slate-700 truncate">{empresa?.nombre || 'Sistema de Ventas'}</span>
+          </div>
+          <div className="text-sm text-slate-500 truncate hidden md:block">
             {profile?.full_name} · <span className="capitalize">{profile?.role}</span>
           </div>
           <button onClick={signOut} className="text-sm text-slate-600 hover:text-slate-900">

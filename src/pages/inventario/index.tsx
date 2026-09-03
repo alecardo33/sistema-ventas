@@ -119,7 +119,7 @@ export function KardexPage() {
 
   return (
     <div>
-      <PageHeader title={`Kardex — ${producto.nombre}`} actions={<Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>} />
+      <PageHeader title={`Kardex — ${producto.nombre}`} actions={<Button variant="secondary" onClick={() => window.print()} className="print:hidden">Imprimir</Button>} />
       <Card className="mb-3 text-sm text-slate-600">
         Código: <span className="font-mono">{producto.codigo}</span> · Stock actual: <strong>{producto.stock}</strong>
       </Card>
