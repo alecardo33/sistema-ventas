@@ -136,3 +136,4 @@ export interface EmpresaConfig {
   moneda: string
   updated_at: string
 }
+export type UsuarioProfile = Profile
