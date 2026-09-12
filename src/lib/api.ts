@@ -600,11 +600,18 @@ export interface UsuarioProfile {
   role: Role
   phone: string | null
   is_active: boolean
+  is_deleted: boolean
   created_at: string
 }
 
+// Solo trae usuarios no eliminados (borrado lógico); los eliminados quedan
+// en la tabla para no romper referencias en ventas/compras/movimientos.
 export async function listUsuarios(): Promise<UsuarioProfile[]> {
-  const { data, error } = await supabase.from('profiles').select('*').order('full_name')
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('is_deleted', false)
+    .order('full_name')
   return must(data, error)
 }
 
@@ -627,8 +634,28 @@ export async function crearUsuario(input: { email: string; password: string; ful
   await supabaseAdminAuth.auth.signOut()
 }
 
-export async function actualizarUsuario(id: string, input: { full_name?: string; role?: Role; is_active?: boolean }): Promise<void> {
+export async function actualizarUsuario(
+  id: string,
+  input: { full_name?: string; role?: Role; is_active?: boolean; is_deleted?: boolean }
+): Promise<void> {
   const { error } = await supabase.from('profiles').update(input).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// Borrado lógico: marca el perfil como eliminado (desaparece de listUsuarios)
+// pero conserva el registro para no romper el historial de ventas/compras/caja
+// que referencian usuario_id. No borra la cuenta de Supabase Auth.
+export async function eliminarUsuario(id: string): Promise<void> {
+  const { error } = await supabase.from('profiles').update({ is_deleted: true, is_active: false }).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// Envía un correo de recuperación de contraseña al usuario. Reemplaza el
+// cambio directo de contraseña, que requeriría service_role en el frontend.
+export async function resetPasswordUsuario(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  })
   if (error) throw new Error(error.message)
 }
 

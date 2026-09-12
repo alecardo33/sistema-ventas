@@ -8,6 +8,8 @@ import {
   listUsuarios,
   crearUsuario,
   actualizarUsuario,
+  eliminarUsuario,
+  resetPasswordUsuario,
   listClientes,
   listProveedores,
   listProductos,
@@ -140,21 +142,34 @@ export function UsuariosPage() {
     }
   }
 
-  // Restablecer/Cambiar contraseña
-  async function cambiarPassword(id: string, nombre: string) {
-    const nuevaPassword = window.prompt(`Ingresa la nueva contraseña para "${nombre}":`)
-    if (!nuevaPassword) return
-
-    if (nuevaPassword.length < 6) {
-      alert('La contraseña debe tener al menos 6 caracteres.')
+  // Enviar correo de recuperación de contraseña (no cambia la contraseña
+  // directamente: eso requeriría service_role en el frontend)
+  async function enviarResetPassword(email: string | undefined, nombre: string) {
+    if (!email) {
+      alert(`"${nombre}" no tiene un correo registrado.`)
       return
     }
+    if (!window.confirm(`¿Enviar correo de recuperación de contraseña a ${email}?`)) return
 
     try {
-      await actualizarUsuario(id, { password: nuevaPassword } as Partial<UsuarioProfile>)
-      alert('Contraseña actualizada correctamente.')
+      await resetPasswordUsuario(email)
+      alert(`Se envió un enlace de recuperación de contraseña a ${email}.`)
     } catch (e) {
-      alert('Error al actualizar la contraseña: ' + (e as Error).message)
+      alert('Error al enviar el correo de recuperación: ' + (e as Error).message)
+    }
+  }
+
+  // Eliminar usuario (borrado lógico): desaparece de la lista pero el
+  // registro se conserva para no romper el historial de ventas/compras/caja
+  async function eliminar(id: string, nombre: string) {
+    if (!window.confirm(`¿Eliminar a "${nombre}"? No podrá volver a iniciar sesión y desaparecerá de esta lista.`)) return
+
+    setUsuarios((prev) => prev.filter((u) => u.id !== id))
+    try {
+      await eliminarUsuario(id)
+    } catch (e) {
+      alert('Error al eliminar el usuario: ' + (e as Error).message)
+      await load() // Revertir en caso de fallar la API
     }
   }
 
@@ -190,8 +205,11 @@ export function UsuariosPage() {
                 <Button variant="secondary" onClick={() => toggleActivo(u.id, !u.is_active)}>
                   {u.is_active ? 'Desactivar' : 'Activar'}
                 </Button>
-                <Button variant="secondary" onClick={() => cambiarPassword(u.id, u.full_name)}>
+                <Button variant="secondary" onClick={() => enviarResetPassword(u.email, u.full_name)}>
                   Clave
+                </Button>
+                <Button variant="secondary" onClick={() => eliminar(u.id, u.full_name)}>
+                  Eliminar
                 </Button>
               </div>
             </Card>
