@@ -27,6 +27,10 @@ export function todayISO(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+export function esHoy(value: string): boolean {
+  return value.slice(0, 10) === todayISO()
+}
+
 export function daysAgoISO(days: number): string {
   const d = new Date()
   d.setDate(d.getDate() - days)

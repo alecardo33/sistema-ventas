@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient'
+import { esHoy } from '@/utils/format'
 import { supabaseAdminAuth } from '@/lib/supabaseAdminClient'
 import type {
   Cliente,
@@ -496,12 +497,19 @@ export async function crearCompra(input: {
   numero_documento: string
   items: { producto_id: string; cantidad: number; precio_compra: number }[]
   usuario_id: string
+  glosa?: string
 }): Promise<Compra> {
   const total = input.items.reduce((acc, i) => acc + i.cantidad * i.precio_compra, 0)
 
   const { data: compra, error } = await supabase
     .from('compras')
-    .insert({ proveedor_id: input.proveedor_id, numero_documento: input.numero_documento, total, usuario_id: input.usuario_id })
+    .insert({
+      proveedor_id: input.proveedor_id,
+      numero_documento: input.numero_documento,
+      total,
+      usuario_id: input.usuario_id,
+      glosa: input.glosa || null,
+    })
     .select()
     .single()
   if (error) throw new Error(error.message)
@@ -555,11 +563,22 @@ export async function anularCompra(id: string, motivo: string, usuario_id: strin
     usuario_id,
   })
 
+  const glosaFinal = compra.glosa ? `${compra.glosa} | Anulada: ${motivo}` : `Anulada: ${motivo}`
+
   const { error } = await supabase
     .from('compras')
-    .update({ estado: 'anulada', anulado_por: usuario_id, anulado_at: new Date().toISOString() })
+    .update({ estado: 'anulada', anulado_por: usuario_id, anulado_at: new Date().toISOString(), glosa: glosaFinal })
     .eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+// Solo Admin puede editar, y únicamente el mismo día en que se registró la
+// compra (evita corregir compras antiguas cuyo stock ya pudo moverse por
+// ventas/ajustes posteriores). "Editar" en la práctica anula la compra
+// original y abre el formulario de nueva compra prellenado — ver
+// CompraDetallePage/NuevaCompraPage.
+export function puedeEditarCompra(compra: Compra, role: Role): boolean {
+  return role === 'admin' && compra.estado !== 'anulada' && esHoy(compra.created_at)
 }
 
 // ---------------------------------------------------------------------

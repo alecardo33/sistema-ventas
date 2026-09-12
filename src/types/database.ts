@@ -124,6 +124,7 @@ export interface Compra {
   usuario_id: string
   anulado_por: string | null
   anulado_at: string | null
+  glosa: string | null
   created_at: string
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { listCompras, crearCompra, getCompra, anularCompra, listProveedores, listProductos, type CompraConDetalle } from '@/lib/api'
+import { listCompras, crearCompra, getCompra, anularCompra, puedeEditarCompra, listProveedores, listProductos, type CompraConDetalle } from '@/lib/api'
 import type { Proveedor, Producto, Compra } from '@/types/database'
 import { formatDateTime, formatMoney, todayISO, daysAgoISO } from '@/utils/format'
 import { Badge, Button, Card, ConfirmModal, EmptyState, ErrorText, Field, Input, PageHeader, Select, Spinner, Table, Textarea } from '@/components/ui'
@@ -70,15 +70,28 @@ export function ComprasPage() {
   )
 }
 
+interface PrellenadoCompra {
+  proveedor_id: string
+  numero_documento: string
+  items: { producto_id: string; nombre: string; cantidad: number; precio_compra: number }[]
+  glosa: string
+}
+
 export function NuevaCompraPage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const prellenado = (location.state as { prellenado?: PrellenadoCompra } | null)?.prellenado
+
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
-  const [proveedorId, setProveedorId] = useState('')
-  const [numeroDocumento, setNumeroDocumento] = useState('')
+  const [proveedorId, setProveedorId] = useState(prellenado?.proveedor_id ?? '')
+  const [numeroDocumento, setNumeroDocumento] = useState(prellenado?.numero_documento ?? '')
+  const [glosa, setGlosa] = useState(prellenado?.glosa ?? '')
   const [buscarProducto, setBuscarProducto] = useState('')
-  const [items, setItems] = useState<{ producto_id: string; nombre: string; cantidad: number; precio_compra: number }[]>([])
+  const [items, setItems] = useState<{ producto_id: string; nombre: string; cantidad: number; precio_compra: number }[]>(
+    prellenado?.items ?? []
+  )
   const [showProveedorModal, setShowProveedorModal] = useState(false)
   const [showProductoModal, setShowProductoModal] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -123,6 +136,7 @@ export function NuevaCompraPage() {
         numero_documento: numeroDocumento,
         items,
         usuario_id: profile!.id,
+        glosa,
       })
       navigate(`/compras/${compra.id}`)
     } catch (e) {
@@ -134,7 +148,12 @@ export function NuevaCompraPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Nueva compra" />
+      <PageHeader title={prellenado ? 'Nueva compra (corrección)' : 'Nueva compra'} />
+      {prellenado && (
+        <div className="rounded-lg bg-amber-50 text-amber-800 text-sm px-3 py-2">
+          La compra original fue anulada. Revisa y corrige los datos antes de confirmar.
+        </div>
+      )}
       <Card className="grid sm:grid-cols-2 gap-3">
         <Field label="Proveedor">
           <div className="flex gap-2">
@@ -154,6 +173,11 @@ export function NuevaCompraPage() {
         <Field label="N° de documento (factura/recibo)">
           <Input value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} />
         </Field>
+        <div className="sm:col-span-2">
+          <Field label="Glosa (opcional)">
+            <Textarea placeholder="Ej: ajuste, nota interna…" value={glosa} onChange={(e) => setGlosa(e.target.value)} />
+          </Field>
+        </div>
       </Card>
 
       <Card className="space-y-2">
@@ -236,10 +260,13 @@ export function NuevaCompraPage() {
 export function CompraDetallePage() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const [compra, setCompra] = useState<CompraConDetalle | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAnular, setShowAnular] = useState(false)
+  const [showEditar, setShowEditar] = useState(false)
   const [motivo, setMotivo] = useState('')
+  const [motivoEdicion, setMotivoEdicion] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   async function load() {
@@ -256,6 +283,7 @@ export function CompraDetallePage() {
   if (!compra) return <EmptyState text="Compra no encontrada." />
 
   const puedeAnular = profile?.role === 'admin' && compra.estado !== 'anulada'
+  const puedeEditar = profile ? puedeEditarCompra(compra, profile.role) : false
 
   return (
     <div className="space-y-4">
@@ -266,6 +294,11 @@ export function CompraDetallePage() {
             <Button variant="secondary" onClick={() => window.print()}>
               Imprimir
             </Button>
+            {puedeEditar && (
+              <Button variant="secondary" onClick={() => setShowEditar(true)}>
+                Editar
+              </Button>
+            )}
             {puedeAnular && (
               <Button variant="danger" onClick={() => setShowAnular(true)}>
                 Anular compra
@@ -282,6 +315,7 @@ export function CompraDetallePage() {
           </div>
           <Badge color={compra.estado === 'anulada' ? 'red' : 'green'}>{compra.estado}</Badge>
         </div>
+        {compra.glosa && <p className="text-sm text-slate-500 mb-3">Glosa: {compra.glosa}</p>}
         <Table head={['Producto', 'Cantidad', 'P. Compra', 'Subtotal']}>
           {compra.compra_detalles.map((d) => (
             <tr key={d.id}>
@@ -295,6 +329,39 @@ export function CompraDetallePage() {
         <div className="flex justify-end mt-3 font-semibold">Total: {formatMoney(compra.total)}</div>
       </Card>
 
+      {showEditar && (
+        <ConfirmModal
+          title="Editar compra"
+          message="Esto anula la compra actual (revierte stock y caja) y abre un formulario nuevo con los mismos datos para que los corrijas. No se puede deshacer."
+          danger
+          confirmLabel="Anular y corregir"
+          onClose={() => setShowEditar(false)}
+          extra={<Textarea placeholder="Motivo de la corrección…" value={motivoEdicion} onChange={(e) => setMotivoEdicion(e.target.value)} />}
+          onConfirm={async () => {
+            try {
+              await anularCompra(compra.id, motivoEdicion || 'Corrección', profile!.id)
+              navigate('/compras/nueva', {
+                state: {
+                  prellenado: {
+                    proveedor_id: compra.proveedor_id,
+                    numero_documento: compra.numero_documento ?? '',
+                    items: compra.compra_detalles.map((d) => ({
+                      producto_id: d.producto_id,
+                      nombre: d.productos.nombre,
+                      cantidad: d.cantidad,
+                      precio_compra: d.precio_compra,
+                    })),
+                    glosa: `Corrección de compra ${compra.id.slice(0, 8)}: ${motivoEdicion || 'sin detalle'}`,
+                  },
+                },
+              })
+            } catch (e) {
+              setError((e as Error).message)
+              setShowEditar(false)
+            }
+          }}
+        />
+      )}
       {showAnular && (
         <ConfirmModal
           title="Anular compra"
