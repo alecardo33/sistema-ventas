@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient'
 import { esHoy } from '@/utils/format'
+import * as XLSX from 'xlsx'
 import { supabaseAdminAuth } from '@/lib/supabaseAdminClient'
 import type {
   Cliente,
@@ -701,4 +702,62 @@ export async function resumenDashboard(hoy: string, role: Role) {
     cuentasPorCobrar: cuentasPorCobrar.length,
     totalPorCobrar,
   }
+}
+
+// ---------------------------------------------------------------------
+// RESPALDO / RESTAURACIÓN (solo Admin)
+// ---------------------------------------------------------------------
+// Tablas incluidas en el respaldo, en el orden en que se deben restaurar
+// (padres antes que hijos, por las llaves foráneas). No incluye `profiles`
+// ni ningún dato de auth — los usuarios no se tocan al restaurar.
+const TABLAS_RESPALDO = [
+  'categorias',
+  'clientes',
+  'proveedores',
+  'productos',
+  'cotizaciones',
+  'cotizacion_detalles',
+  'ventas',
+  'venta_detalles',
+  'pagos_venta',
+  'compras',
+  'compra_detalles',
+  'movimientos_inventario',
+  'movimientos_caja',
+  'empresa_config',
+] as const
+
+// Descarga un archivo Excel con una hoja por tabla. No incluye usuarios ni
+// datos de autenticación.
+export async function exportarRespaldo(): Promise<void> {
+  const wb = XLSX.utils.book_new()
+
+  for (const tabla of TABLAS_RESPALDO) {
+    const { data, error } = await supabase.from(tabla).select('*')
+    if (error) throw new Error(`Error al leer ${tabla}: ${error.message}`)
+    const hoja = XLSX.utils.json_to_sheet(data ?? [])
+    XLSX.utils.book_append_sheet(wb, hoja, tabla)
+  }
+
+  const fecha = new Date().toISOString().slice(0, 10)
+  XLSX.writeFile(wb, `respaldo-sisventas-${fecha}.xlsx`)
+}
+
+// Lee el Excel generado por exportarRespaldo() y llama al RPC
+// restaurar_respaldo (ver supabase/respaldo_restaurar_rpc.sql), que
+// reemplaza el contenido de todas las tablas listadas arriba. Solo
+// funciona si las columnas usuario_id/created_by del archivo corresponden
+// a usuarios que ya existen en este mismo proyecto de Supabase.
+export async function restaurarRespaldo(file: File): Promise<void> {
+  const buffer = await file.arrayBuffer()
+  const wb = XLSX.read(buffer, { type: 'array' })
+
+  const payload: Record<string, unknown[]> = {}
+  for (const tabla of TABLAS_RESPALDO) {
+    const hoja = wb.Sheets[tabla]
+    payload[tabla] = hoja ? XLSX.utils.sheet_to_json(hoja) : []
+  }
+
+  const { error } = await supabase.rpc('restaurar_respaldo', { p_data: payload })
+  if (error) throw new Error(error.message)
 }

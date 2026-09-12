@@ -16,6 +16,7 @@ import {
   listVentas,
   listCompras,
   listMovimientosCaja,
+  exportarRespaldo,
   type UsuarioProfile,
 } from '@/lib/api'
 import type { EmpresaConfig, Role } from '@/types/database'
@@ -273,6 +274,47 @@ export function NuevoUsuarioPage() {
           {saving ? 'Creando…' : 'Crear usuario'}
         </Button>
       </Card>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------
+// RESPALDO / RESTAURACIÓN
+// ---------------------------------------------------------------------
+export function RespaldoPage() {
+  const [exportando, setExportando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleExportar() {
+    setExportando(true)
+    setError(null)
+    try {
+      await exportarRespaldo()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setExportando(false)
+    }
+  }
+
+  return (
+    <div className="max-w-lg space-y-4">
+      <PageHeader title="Respaldo" />
+
+      <Card className="space-y-3">
+        <div>
+          <p className="font-medium">Exportar respaldo</p>
+          <p className="text-sm text-slate-500">
+            Descarga un Excel con clientes, proveedores, productos, ventas, compras, cotizaciones, inventario y caja.
+            No incluye usuarios ni contraseñas.
+          </p>
+        </div>
+        <Button onClick={handleExportar} disabled={exportando}>
+          {exportando ? 'Generando…' : 'Descargar respaldo (Excel)'}
+        </Button>
+      </Card>
+
+      <ErrorText>{error}</ErrorText>
     </div>
   )
 }
